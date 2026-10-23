@@ -179,7 +179,7 @@ export const Dashboard = () => {
         if (!blob) return;
         if (navigator.share) {
           const file = new File([blob], `Bill_${selectedInvoice.billNo}.png`, { type: 'image/png' });
-          await navigator.share({ files: [file], title: 'Balaji Fancy Store' });
+          await navigator.share({ files: [file], title: 'Niranjana Enterprises' });
         }
       }, 'image/png');
     } catch (error) { console.error(error); }
@@ -287,7 +287,7 @@ export const Dashboard = () => {
     <Box sx={{ flexGrow: 1, p: { xs: 2, md: 4 }, bgcolor: '#F4F7FE', minHeight: '100vh' }}>
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
-          <Typography variant="h4" fontWeight="800" color="#2B3674">Balaji Fancy Store</Typography>
+          <Typography variant="h4" fontWeight="800" color="#2B3674">Niranjana Enterprises</Typography>
           <Typography variant="body2" color="textSecondary">Business Analytics</Typography>
         </Box>
         <IconButton onClick={() => loadData()}><Refresh className={refreshing ? 'spin' : ''} /></IconButton>
