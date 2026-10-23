@@ -1,0 +1,20 @@
+{
+  "short_name": "Niranjana Enterprises",
+  "name": " POS System",
+  "icons": [
+    {
+      "src": "/icon-5121.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-5121.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#242845",
+  "background_color": "#ffffff"
+}
