@@ -300,10 +300,10 @@ export function PointOfSale() {
       const dateStr = now.toLocaleDateString('en-GB');
       const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-      let billHeader = `\n${SIZE_BIG}${BOLD_ON}Shree Appalam Mart ${SIZE_NORMAL}.${BOLD_OFF}\n` +
-        `Quality Appalam & Vadam Store\n` +
-        `Mob: 9940134227\n--------------------------------\n` +
-        `GST NO: 33AZWPA61061ZI\n--------------------------------\n` +
+      let billHeader = `\n${SIZE_BIG}${BOLD_ON}Niranjana EnterPrises ${SIZE_NORMAL}.${BOLD_OFF}\n` +
+        `Niranjana Enterprises\n` +
+        `Mob: 9043707705\n--------------------------------\n` +
+        `GST NO: 33##WPA61061Z#\n--------------------------------\n` +
         `DT: ${dateStr}  TM: ${timeStr}\nBill No: ${billNo}\n`;
 
       if (customerName || customerPhone || customerAddress || customerGst) {
@@ -426,7 +426,7 @@ export function PointOfSale() {
       />
 
       <Box className="pos-header">
-        <Typography variant="h6" fontWeight="bold" align="center">Appalam & Vadam Store</Typography>
+        <Typography variant="h6" fontWeight="bold" align="center">Niranjana Enterprises</Typography>
         <Stack direction="row" justifyContent="space-between" px={1}>
           <Typography variant="caption">Time: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Typography>
           <Typography variant="caption">Date: {new Date().toLocaleDateString('en-GB')}</Typography>
