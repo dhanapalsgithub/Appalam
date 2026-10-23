@@ -581,8 +581,8 @@ export function PointOfSale() {
         <DialogTitle sx={{ bgcolor: '#fff9c4', textAlign: 'center', fontWeight: 'bold' }}>Appalam Bill Preview</DialogTitle>
         <DialogContent sx={{ p: 2 }}>
           <Box sx={{ textAlign: 'center', mb: 1 }}>
-            <Typography variant="h6" fontWeight="bold">Shree Appalam Mart</Typography>
-            <Typography variant="caption" display="block">Appalam Store, GST: 33AZWPA61061ZI</Typography>
+            <Typography variant="h6" fontWeight="bold">Niranjana Enterprises</Typography>
+            <Typography variant="caption" display="block">Appalam Store, GST: 3##ZWPA61061#</Typography>
           </Box>
           
           <Divider sx={{ my: 1, borderStyle: 'dashed' }} />
