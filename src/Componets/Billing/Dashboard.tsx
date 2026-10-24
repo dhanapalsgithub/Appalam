@@ -233,7 +233,7 @@ export const Dashboard = () => {
       await new Promise(r => setTimeout(r, 500));
       await char.writeValue(enc.encode('\x1B\x61\x01'));
 
-      const logoBytes = await getImageBytes('/logobf5.png', 120);
+      const logoBytes = await getImageBytes('/logo-5121.png', 150);
       if (logoBytes) await sendLargeData(char, logoBytes);
 
       let header = `Niranjana Enterprises\nChennai - 600069\n9043707705\n--------------------------------\n` +

@@ -2,7 +2,7 @@ import {
   Box, Typography, Button, IconButton, Stack, Grid as Grid,
   Dialog, DialogTitle, DialogContent, DialogActions, Divider, Checkbox, FormControlLabel, TextField, InputAdornment, Chip, Switch, Autocomplete
 } from '@mui/material';
-import { X, Printer, Search } from 'lucide-react';
+import { X, Printer, Search, Plus } from 'lucide-react';
 import '../POS.css';
 import { AppHeader } from '../Header';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -33,38 +33,16 @@ interface Product {
   type: string;
 }
 
-const CATEGORIES = ['Type 1', 'Type 2', 'Type 3', 'Type 4', 'Type 5', 'Type 6'];
+const CATEGORIES = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Number 6', 'Custom'];
 
-const PRODUCTS: Product[] = [
-  { id: 'app1_250', name: 'Type 1 (250g)', price: 0, category: 'Type 1', size: '250g', type: 'Type 1', unit: 'pkt' },
-  { id: 'app1_500', name: 'Type 1 (500g)', price: 0, category: 'Type 1', size: '500g', type: 'Type 1', unit: 'pkt' },
-  { id: 'app1_1kg', name: 'Type 1 (1kg)', price: 0, category: 'Type 1', size: '1kg', type: 'Type 1', unit: 'pkt' },
-  { id: 'app1_2kg', name: 'Type 1 (2kg)', price: 0, category: 'Type 1', size: '2kg', type: 'Type 1', unit: 'pkt' },
+const INITIAL_PRODUCTS: Product[] = [
+  { id: 'app1_250', name: 'Number 1 ', price: 0, category: 'Type 1', size: '250g', type: 'Type 1', unit: 'pkt' },
+  { id: 'app1_500', name: 'Number 2', price: 0, category: 'Type 1', size: '500g', type: 'Type 1', unit: 'pkt' },
+  { id: 'app1_1kg', name: 'Number 3', price: 0, category: 'Type 1', size: '1kg', type: 'Type 1', unit: 'pkt' },
+  { id: 'app1_2kg', name: 'Number 4', price: 0, category: 'Type 1', size: '2kg', type: 'Type 1', unit: 'pkt' },
 
-  { id: 'app2_250', name: 'Type 2 (250g)', price: 0, category: 'Type 2', size: '250g', type: 'Type 2', unit: 'pkt' },
-  { id: 'app2_500', name: 'Type 2 (500g)', price: 0, category: 'Type 2', size: '500g', type: 'Type 2', unit: 'pkt' },
-  { id: 'app2_1kg', name: 'Type 2 (1kg)', price: 0, category: 'Type 2', size: '1kg', type: 'Type 2', unit: 'pkt' },
-  { id: 'app2_2kg', name: 'Type 2 (2kg)', price: 0, category: 'Type 2', size: '2kg', type: 'Type 2', unit: 'pkt' },
-
-  { id: 'app3_250', name: 'Type 3 (250g)', price: 0, category: 'Type 3', size: '250g', type: 'Type 3', unit: 'pkt' },
-  { id: 'app3_500', name: 'Type 3 (500g)', price: 0, category: 'Type 3', size: '500g', type: 'Type 3', unit: 'pkt' },
-  { id: 'app3_1kg', name: 'Type 3 (1kg)', price: 0, category: 'Type 3', size: '1kg', type: 'Type 3', unit: 'pkt' },
-  { id: 'app3_2kg', name: 'Type 3 (2kg)', price: 0, category: 'Type 3', size: '2kg', type: 'Type 3', unit: 'pkt' },
-
-  { id: 'app4_250', name: 'Type 4 (250g)', price: 0, category: 'Type 4', size: '250g', type: 'Type 4', unit: 'pkt' },
-  { id: 'app4_500', name: 'Type 4 (500g)', price: 0, category: 'Type 4', size: '500g', type: 'Type 4', unit: 'pkt' },
-  { id: 'app4_1kg', name: 'Type 4 (1kg)', price: 0, category: 'Type 4', size: '1kg', type: 'Type 4', unit: 'pkt' },
-  { id: 'app4_2kg', name: 'Type 4 (2kg)', price: 0, category: 'Type 4', size: '2kg', type: 'Type 4', unit: 'pkt' },
-
-  { id: 'app5_250', name: 'Type 5 (250g)', price: 0, category: 'Type 5', size: '250g', type: 'Type 5', unit: 'pkt' },
-  { id: 'app5_500', name: 'Type 5 (500g)', price: 0, category: 'Type 5', size: '500g', type: 'Type 5', unit: 'pkt' },
-  { id: 'app5_1kg', name: 'Type 5 (1kg)', price: 0, category: 'Type 5', size: '1kg', type: 'Type 5', unit: 'pkt' },
-  { id: 'app5_2kg', name: 'Type 5 (2kg)', price: 0, category: 'Type 5', size: '2kg', type: 'Type 5', unit: 'pkt' },
-
-  { id: 'app6_250', name: 'Type 6 (250g)', price: 0, category: 'Type 6', size: '250g', type: 'Type 6', unit: 'pkt' },
-  { id: 'app6_500', name: 'Type 6 (500g)', price: 0, category: 'Type 6', size: '500g', type: 'Type 6', unit: 'pkt' },
-  { id: 'app6_1kg', name: 'Type 6 (1kg)', price: 0, category: 'Type 6', size: '1kg', type: 'Type 6', unit: 'pkt' },
-  { id: 'app6_2kg', name: 'Type 6 (2kg)', price: 0, category: 'Type 6', size: '2kg', type: 'Type 6', unit: 'pkt' },
+  { id: 'app2_250', name: 'Number 5', price: 0, category: 'Type 2', size: '250g', type: 'Type 2', unit: 'pkt' },
+  { id: 'app2_500', name: 'Number 6 ', price: 0, category: 'Type 2', size: '500g', type: 'Type 2', unit: 'pkt' },
 ];
 
 let cachedDevice: any = null;
@@ -76,6 +54,25 @@ export function PointOfSale() {
   const [paymentMode, setPaymentMode] = useState<'CASH' | 'SCANNER'>('CASH');
   const [discount, setDiscount] = useState(0);
   const [showDiscountInput, setShowDiscountInput] = useState(false);
+
+  // Products State with LocalStorage memory for custom added products
+  const [productsList, setProductsList] = useState<Product[]>(() => {
+    const saved = localStorage.getItem('pos-custom-products');
+    if (saved) {
+      try {
+        return [...INITIAL_PRODUCTS, ...JSON.parse(saved)];
+      } catch {
+        return INITIAL_PRODUCTS;
+      }
+    }
+    return INITIAL_PRODUCTS;
+  });
+
+  // Custom Product Input State
+  const [customName, setCustomName] = useState('');
+  const [customPrice, setCustomPrice] = useState<number | ''>('');
+  const [customQty, setCustomQty] = useState<number | ''>(1);
+  const [showCustomModal, setShowCustomModal] = useState(false);
 
   // Customer & GST States
   const [customerName, setCustomerName] = useState('');
@@ -122,11 +119,11 @@ export function PointOfSale() {
   const noOfItems = cart.length;
 
   const filteredProducts = useMemo(() => {
-    return PRODUCTS.filter(p => {
+    return productsList.filter(p => {
       if (activeCategory && p.category !== activeCategory) return false;
       return true;
     });
-  }, [activeCategory]);
+  }, [productsList, activeCategory]);
 
   const addItemToCart = useCallback((product: Product) => {
     setCart(prev => {
@@ -141,6 +138,56 @@ export function PointOfSale() {
       }];
     });
   }, []);
+
+  // Add Custom Product directly to Cart or Catalog
+  const handleAddCustomToCart = () => {
+    if (!customName.trim()) {
+      alert("Please enter a product name");
+      return;
+    }
+    const price = Number(customPrice) || 0;
+    const qty = Number(customQty) || 1;
+    const newId = `custom_${Date.now()}`;
+
+    const newProduct: Product = {
+      id: newId,
+      name: customName,
+      price: price,
+      category: 'Custom',
+      size: 'Custom',
+      type: 'Custom',
+      unit: 'pkt'
+    };
+
+    // Save to custom products
+    const savedCustoms = JSON.parse(localStorage.getItem('pos-custom-products') || '[]');
+    const updatedCustoms = [...savedCustoms, newProduct];
+    localStorage.setItem('pos-custom-products', JSON.stringify(updatedCustoms));
+    setProductsList(prev => [...prev, newProduct]);
+
+    // Add to current cart
+    setCart(prev => [...prev, {
+      productId: newId,
+      productName: customName,
+      quantity: qty,
+      price: price,
+      total: price * qty
+    }]);
+
+    setCustomName('');
+    setCustomPrice('');
+    setCustomQty(1);
+    setShowCustomModal(false);
+  };
+
+  const updateCartItemName = (id: string, newName: string) => {
+    setCart(prev => prev.map(item => {
+      if (item.productId === id) {
+        return { ...item, productName: newName };
+      }
+      return item;
+    }));
+  };
 
   const updateCartItemRate = (id: string, newRate: number) => {
     setCart(prev => prev.map(item => {
@@ -291,7 +338,7 @@ export function PointOfSale() {
         }
       };
 
-      const logoBytes = await getImageBytes('/icon-521.png', 150);
+      const logoBytes = await getImageBytes('/icon-5121.png', 170);
       if (logoBytes) {
         await sendLargeData(char, logoBytes);
       }
@@ -301,8 +348,11 @@ export function PointOfSale() {
       const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
       let billHeader = `\n${SIZE_BIG}${BOLD_ON}Niranjana EnterPrises ${SIZE_NORMAL}.${BOLD_OFF}\n` +
-        `Niranjana Enterprises\n` +
-        `Mob: 9043707705\n--------------------------------\n` +
+        `Namma Appalam\n` +
+        `no 13/139,sivashakthi Nagar,sikkarayapuram \n--------------------------------\n` +
+        `chennai-69.\n` +
+        `Mob: 9043707705,8248455168\n--------------------------------\n` +
+    
         `GST NO: 33##WPA61061Z#\n--------------------------------\n` +
         `DT: ${dateStr}  TM: ${timeStr}\nBill No: ${billNo}\n`;
 
@@ -433,10 +483,11 @@ export function PointOfSale() {
         </Stack>
       </Box>
 
-      {/* Dropdown Select */}
-      <Box sx={{ px: 1, py: 1 }}>
+      {/* Dropdown Select & Custom Add Button */}
+      <Box sx={{ px: 1, py: 1, display: 'flex', gap: 1 }}>
         <Autocomplete
-          options={PRODUCTS}
+          fullWidth
+          options={productsList}
           getOptionLabel={(option) => `${option.name}`}
           onChange={(_, selectedOption) => {
             if (selectedOption) addItemToCart(selectedOption);
@@ -457,6 +508,15 @@ export function PointOfSale() {
             />
           )}
         />
+        <Button
+          variant="contained"
+          size="small"
+          onClick={() => setShowCustomModal(true)}
+          sx={{ minWidth: '90px', bgcolor: '#242845' }}
+          startIcon={<Plus size={16} />}
+        >
+          Custom
+        </Button>
       </Box>
 
       {/* Filter Chips */}
@@ -512,7 +572,7 @@ export function PointOfSale() {
       {/* Cart List */}
       <Box className="item-list" sx={{ mt: 1, flex: 1, minHeight: '180px', overflowY: 'auto' }}>
         <Typography variant="caption" sx={{ px: 1, color: '#666', fontWeight: 'bold' }}>
-          Cart Items (Enter Amount & Qty below):
+          Cart Items (Edit Name, Amount & Qty below):
         </Typography>
         {cart.map((item, index) => (
           <Box key={item.productId} sx={{ p: 1, borderBottom: '1px solid #eee' }}>
@@ -521,9 +581,14 @@ export function PointOfSale() {
                 <Typography variant="body2">{index + 1}</Typography>
               </Grid>
               <Grid size={4}>
-                <Typography variant="body2" fontWeight="bold" noWrap>
-                  {item.productName}
-                </Typography>
+                <TextField
+                  size="small"
+                  variant="standard"
+                  value={item.productName}
+                  onChange={(e) => updateCartItemName(item.productId, e.target.value)}
+                  InputProps={{ disableUnderline: true }}
+                  sx={{ '& input': { fontWeight: 'bold', fontSize: '0.85rem', p: 0 } }}
+                />
               </Grid>
               <Grid size={4} display="flex" alignItems="center" gap={0.5}>
                 <TextField
@@ -575,6 +640,45 @@ export function PointOfSale() {
           Total: ₹{finalTotal.toLocaleString('en-IN')} - PREVIEW
         </Button>
       </Box>
+
+      {/* Custom Item Entry Dialog */}
+      <Dialog open={showCustomModal} onClose={() => setShowCustomModal(false)} fullWidth maxWidth="xs">
+        <DialogTitle sx={{ textAlign: 'center', fontWeight: 'bold' }}>Add Custom Product</DialogTitle>
+        <DialogContent sx={{ p: 2 }}>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              label="Product Name"
+              size="small"
+              fullWidth
+              autoFocus
+              value={customName}
+              onChange={(e) => setCustomName(e.target.value)}
+            />
+            <TextField
+              label="Price (₹)"
+              type="number"
+              size="small"
+              fullWidth
+              value={customPrice}
+              onChange={(e) => setCustomPrice(e.target.value ? Number(e.target.value) : '')}
+            />
+            <TextField
+              label="Quantity"
+              type="number"
+              size="small"
+              fullWidth
+              value={customQty}
+              onChange={(e) => setCustomQty(e.target.value ? Number(e.target.value) : '')}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button variant="outlined" fullWidth onClick={() => setShowCustomModal(false)}>Cancel</Button>
+          <Button variant="contained" fullWidth onClick={handleAddCustomToCart} sx={{ bgcolor: '#242845' }}>
+            Add To Cart
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Preview Dialog */}
       <Dialog open={showPreview} onClose={() => setShowPreview(false)} fullWidth maxWidth="xs">

@@ -497,7 +497,7 @@ await char.writeValue(enc.encode(billFooter));
       />
       {/* Header & Categories... same as your original */}
       <Box className="pos-header">
-        <Typography variant="h6" fontWeight="bold" align="center">Niranjana Enterprises</Typography>
+        <Typography variant="h6" fontWeight="bold" align="center">Namma Appalam</Typography>
         <Stack direction="row" justifyContent="space-between" px={1}>
           <Typography variant="caption">Time: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Typography>
           <Typography variant="caption">Date: {new Date().toLocaleDateString('en-GB')}</Typography>
