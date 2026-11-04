@@ -1,11 +1,11 @@
 import {
   Box, Typography, Button, IconButton, Stack, Grid as Grid,
-  Dialog, DialogTitle, DialogContent, DialogActions, Divider, Checkbox, FormControlLabel, TextField, InputAdornment, Chip, Switch, Autocomplete
+  Dialog, DialogTitle, DialogContent, DialogActions, Divider, Checkbox, FormControlLabel, TextField, Chip, Switch
 } from '@mui/material';
-import { X, Printer, Search, Plus } from 'lucide-react';
+import { X, Printer } from 'lucide-react';
 import '../POS.css';
 import { AppHeader } from '../Header';
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Save } from 'lucide-react';
 
 declare global {
@@ -20,6 +20,7 @@ interface POSItem {
   quantity: number;
   price: number;
   total: number;
+  pkgType?: string;
 }
 
 type Unit = 'kg' | 'pcs' | 'pkt';
@@ -33,16 +34,13 @@ interface Product {
   type: string;
 }
 
-const CATEGORIES = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Number 6', 'Custom'];
-
 const INITIAL_PRODUCTS: Product[] = [
-  { id: 'app1_250', name: 'Number 1 ', price: 0, category: 'Type 1', size: '250g', type: 'Type 1', unit: 'pkt' },
-  { id: 'app1_500', name: 'Number 2', price: 0, category: 'Type 1', size: '500g', type: 'Type 1', unit: 'pkt' },
-  { id: 'app1_1kg', name: 'Number 3', price: 0, category: 'Type 1', size: '1kg', type: 'Type 1', unit: 'pkt' },
-  { id: 'app1_2kg', name: 'Number 4', price: 0, category: 'Type 1', size: '2kg', type: 'Type 1', unit: 'pkt' },
-
-  { id: 'app2_250', name: 'Number 5', price: 0, category: 'Type 2', size: '250g', type: 'Type 2', unit: 'pkt' },
-  { id: 'app2_500', name: 'Number 6 ', price: 0, category: 'Type 2', size: '500g', type: 'Type 2', unit: 'pkt' },
+  { id: 'app_1', name: 'No:01 - 6 Inch', price: 0, category: 'Appalam', size: '6 Inch', type: 'Appalam', unit: 'pkt' },
+  { id: 'app_2', name: 'No:02 - 5.25 Inch', price: 0, category: 'Appalam', size: '5.25 Inch', type: 'Appalam', unit: 'pkt' },
+  { id: 'app_3', name: 'No:03 - 4.75 Inch', price: 0, category: 'Appalam', size: '4.75 Inch', type: 'Appalam', unit: 'pkt' },
+  { id: 'app_4', name: 'No:04 - 4.25 Inch', price: 0, category: 'Appalam', size: '4.25 Inch', type: 'Appalam', unit: 'pkt' },
+  { id: 'app_5', name: 'No:05 - 4 inch', price: 0, category: 'Appalam', size: '4 inch', type: 'Appalam', unit: 'pkt' },
+  { id: 'app_6', name: 'No:06 - 3.25 Inch', price: 0, category: 'Appalam', size: '3.25 Inch', type: 'Appalam', unit: 'pkt' },
 ];
 
 let cachedDevice: any = null;
@@ -55,24 +53,16 @@ export function PointOfSale() {
   const [discount, setDiscount] = useState(0);
   const [showDiscountInput, setShowDiscountInput] = useState(false);
 
-  // Products State with LocalStorage memory for custom added products
-  const [productsList, setProductsList] = useState<Product[]>(() => {
-    const saved = localStorage.getItem('pos-custom-products');
-    if (saved) {
-      try {
-        return [...INITIAL_PRODUCTS, ...JSON.parse(saved)];
-      } catch {
-        return INITIAL_PRODUCTS;
-      }
-    }
-    return INITIAL_PRODUCTS;
-  });
+  // Selected item for Package Modal
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [showPkgModal, setShowPkgModal] = useState(false);
 
-  // Custom Product Input State
-  const [customName, setCustomName] = useState('');
-  const [customPrice, setCustomPrice] = useState<number | ''>('');
-  const [customQty, setCustomQty] = useState<number | ''>(1);
-  const [showCustomModal, setShowCustomModal] = useState(false);
+  // Focus tracking state for newly added item rate input
+  const [focusId, setFocusId] = useState<string | null>(null);
+  const rateInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
+
+  // Products State
+  const [productsList] = useState<Product[]>(INITIAL_PRODUCTS);
 
   // Customer & GST States
   const [customerName, setCustomerName] = useState('');
@@ -80,8 +70,6 @@ export function PointOfSale() {
   const [customerAddress, setCustomerAddress] = useState('');
   const [customerGst, setCustomerGst] = useState('');
   const [gstEnabled, setGstEnabled] = useState(false);
-
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   const [billNo, setBillNo] = useState(() => {
     const saved = localStorage.getItem('lastBillNo');
@@ -109,6 +97,15 @@ export function PointOfSale() {
     }
   }, [cart]);
 
+  // Focus Rate Input when new item is added
+  useEffect(() => {
+    if (focusId && rateInputRefs.current[focusId]) {
+      rateInputRefs.current[focusId]?.focus();
+      rateInputRefs.current[focusId]?.select();
+      setFocusId(null);
+    }
+  }, [focusId, cart]);
+
   const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
   const totalQty = cart.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
   const discountedSubtotal = Math.max(0, subtotal - discount);
@@ -118,66 +115,47 @@ export function PointOfSale() {
   const finalTotal = Math.round(discountedSubtotal + cgstAmount + sgstAmount);
   const noOfItems = cart.length;
 
-  const filteredProducts = useMemo(() => {
-    return productsList.filter(p => {
-      if (activeCategory && p.category !== activeCategory) return false;
-      return true;
-    });
-  }, [productsList, activeCategory]);
+  // Tile Click handler -> open modal
+  const handleTileClick = (product: Product) => {
+    setSelectedProduct(product);
+    setShowPkgModal(true);
+  };
 
-  const addItemToCart = useCallback((product: Product) => {
-    setCart(prev => {
-      const existing = prev.find(c => c.productId === product.id);
-      if (existing) return prev;
-      return [...prev, {
-        productId: product.id,
-        productName: product.name,
+  // Add Selected Product with chosen package to Cart
+  const handleSelectPackage = (pkgType: string) => {
+    if (!selectedProduct) return;
+    const newId = `${selectedProduct.id}_${Date.now()}`;
+    const itemFullName = `${selectedProduct.name} (${pkgType})`;
+
+    setCart(prev => [
+      ...prev,
+      {
+        productId: newId,
+        productName: itemFullName,
         quantity: 1,
-        price: product.price || 0,
-        total: (product.price || 0) * 1
-      }];
-    });
-  }, []);
+        price: 0,
+        total: 0,
+        pkgType: pkgType
+      }
+    ]);
 
-  // Add Custom Product directly to Cart or Catalog
-  const handleAddCustomToCart = () => {
-    if (!customName.trim()) {
-      alert("Please enter a product name");
-      return;
-    }
-    const price = Number(customPrice) || 0;
-    const qty = Number(customQty) || 1;
+    setShowPkgModal(false);
+    setSelectedProduct(null);
+    setFocusId(newId);
+  };
+
+  // Add Custom / Package directly from bottom bar
+  const handleDirectPackageClick = (pkgName: string) => {
     const newId = `custom_${Date.now()}`;
-
-    const newProduct: Product = {
-      id: newId,
-      name: customName,
-      price: price,
-      category: 'Custom',
-      size: 'Custom',
-      type: 'Custom',
-      unit: 'pkt'
-    };
-
-    // Save to custom products
-    const savedCustoms = JSON.parse(localStorage.getItem('pos-custom-products') || '[]');
-    const updatedCustoms = [...savedCustoms, newProduct];
-    localStorage.setItem('pos-custom-products', JSON.stringify(updatedCustoms));
-    setProductsList(prev => [...prev, newProduct]);
-
-    // Add to current cart
+    const name = pkgName === 'custom' ? '' : pkgName;
     setCart(prev => [...prev, {
       productId: newId,
-      productName: customName,
-      quantity: qty,
-      price: price,
-      total: price * qty
+      productName: name,
+      quantity: 1,
+      price: 0,
+      total: 0
     }]);
-
-    setCustomName('');
-    setCustomPrice('');
-    setCustomQty(1);
-    setShowCustomModal(false);
+    setFocusId(newId);
   };
 
   const updateCartItemName = (id: string, newName: string) => {
@@ -258,7 +236,7 @@ export function PointOfSale() {
         customerAddress: customerAddress || '',
         customerGst: customerGst || '',
         gstEnabled: gstEnabled,
-        items: cart.map(i => `${i.productName}(${i.price}x${i.quantity})`).join(", "),
+        items: cart.map(i => `${i.productName || 'Custom'}(${i.price}x${i.quantity})`).join(", "),
         subtotal: Math.round(subtotal),
         discount: discount,
         finalTotal: finalTotal,
@@ -347,12 +325,11 @@ export function PointOfSale() {
       const dateStr = now.toLocaleDateString('en-GB');
       const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-      let billHeader = `\n${SIZE_BIG}${BOLD_ON}Niranjana EnterPrises ${SIZE_NORMAL}.${BOLD_OFF}\n` +
+      let billHeader = `\n${SIZE_BIG}${BOLD_ON}Niranjana Enterprises ${SIZE_NORMAL}.${BOLD_OFF}\n` +
         `Namma Appalam\n` +
         `no 13/139,sivashakthi Nagar,sikkarayapuram \n--------------------------------\n` +
         `chennai-69.\n` +
         `Mob: 9043707705,8248455168\n--------------------------------\n` +
-    
         `GST NO: 33##WPA61061Z#\n--------------------------------\n` +
         `DT: ${dateStr}  TM: ${timeStr}\nBill No: ${billNo}\n`;
 
@@ -374,7 +351,7 @@ export function PointOfSale() {
 
       cart.forEach((item, index) => {
         const sno = (index + 1).toString().padEnd(3);
-        const name = item.productName.substring(0, 10).padEnd(14);
+        const name = (item.productName || 'Custom').substring(0, 10).padEnd(14);
         const rate = parseFloat(String(item.price)).toFixed(2).padStart(9);
         const qty = parseFloat(String(item.quantity)).toFixed(2).padStart(9);
         const total = parseFloat(String(item.total)).toFixed(2).padStart(7);
@@ -442,7 +419,7 @@ export function PointOfSale() {
           customerAddress: customerAddress || '',
           customerGst: customerGst || '',
           gstEnabled,
-          items: cart.map(i => `${i.productName}(${i.price}x${i.quantity})`).join(", "), 
+          items: cart.map(i => `${i.productName || 'Custom'}(${i.price}x${i.quantity})`).join(", "), 
           subtotal, 
           discount, 
           finalTotal, 
@@ -463,7 +440,7 @@ export function PointOfSale() {
   };
 
   return (
-    <Box className="pos-container">
+    <Box className="pos-container" sx={{ bgcolor: '#0b1d42', minHeight: '100vh', color: '#fff', pb: 4 }}>
       <AppHeader
         title="Appalam Billing"
         onBack={() => {
@@ -475,93 +452,43 @@ export function PointOfSale() {
         }}
       />
 
-      <Box className="pos-header">
-        <Typography variant="h6" fontWeight="bold" align="center">Niranjana Enterprises</Typography>
-        <Stack direction="row" justifyContent="space-between" px={1}>
+      <Box className="pos-header" sx={{ textAlign: 'center', py: 1 }}>
+        <Typography variant="body2" sx={{ opacity: 0.8 }}>{new Date().toLocaleDateString('en-GB')}</Typography>
+        <Typography variant="h6" fontWeight="bold" sx={{ color: '#fff' }}>Niranjana Enterprises</Typography>
+        <Stack direction="row" justifyContent="space-between" px={2} sx={{ mt: 0.5 }}>
           <Typography variant="caption">Time: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Typography>
           <Typography variant="caption">Date: {new Date().toLocaleDateString('en-GB')}</Typography>
         </Stack>
       </Box>
 
-      {/* Dropdown Select & Custom Add Button */}
-      <Box sx={{ px: 1, py: 1, display: 'flex', gap: 1 }}>
-        <Autocomplete
-          fullWidth
-          options={productsList}
-          getOptionLabel={(option) => `${option.name}`}
-          onChange={(_, selectedOption) => {
-            if (selectedOption) addItemToCart(selectedOption);
-          }}
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              size="small"
-              placeholder="Search Type 1 to Type 6 (250g, 500g, 1kg, 2kg)..."
-              InputProps={{
-                ...params.InputProps,
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search size={18} />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          )}
-        />
-        <Button
-          variant="contained"
-          size="small"
-          onClick={() => setShowCustomModal(true)}
-          sx={{ minWidth: '90px', bgcolor: '#242845' }}
-          startIcon={<Plus size={16} />}
-        >
-          Custom
-        </Button>
-      </Box>
-
-      {/* Filter Chips */}
-      <Box sx={{ px: 1, pb: 1, overflowX: 'auto' }}>
-        <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'nowrap', minWidth: 'max-content' }}>
-          {CATEGORIES.map(cat => {
-            const isActive = activeCategory === cat;
-            return (
-              <Chip
-                key={cat}
-                label={cat}
-                size="small"
-                clickable
-                color={isActive ? 'primary' : 'default'}
-                variant={isActive ? 'filled' : 'outlined'}
-                onClick={() => setActiveCategory(isActive ? null : cat)}
-                onDelete={isActive ? () => setActiveCategory(null) : undefined}
-              />
-            );
-          })}
-        </Stack>
-      </Box>
-
-      {/* Product Tiles */}
-      <Box sx={{ px: 1, pb: 1, maxHeight: '25vh', overflowY: 'auto' }}>
-        <Grid container spacing={0.75}>
-          {filteredProducts.map(p => (
+      {/* No:01 to No:06 Product Tiles */}
+      <Box sx={{ px: 1.5, py: 1 }}>
+        <Grid container spacing={1}>
+          {productsList.map(p => (
             <Grid size={4} key={p.id}>
               <Box
-                onClick={() => addItemToCart(p)}
+                onClick={() => handleTileClick(p)}
                 sx={{
-                  border: '1px solid #ddd',
-                  borderRadius: 1,
-                  p: 0.75,
+                  border: '1px solid #ffffff33',
+                  borderRadius: 1.5,
+                  p: 1,
                   cursor: 'pointer',
-                  bgcolor: '#fff',
-                  minHeight: 50,
+                  bgcolor: '#ffffff',
+                  color: '#0b1d42',
+                  minHeight: 55,
                   display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
                   '&:active': { transform: 'scale(0.97)' }
                 }}
               >
-                <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.72rem' }} align="center">
-                  {p.name}
+                <Typography variant="caption" sx={{ fontWeight: 800, fontSize: '0.8rem', color: '#0b1d42' }}>
+                  {p.name.split(' - ')[0]}
+                </Typography>
+                <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.7rem', color: '#555' }}>
+                  {p.name.split(' - ')[1]}
                 </Typography>
               </Box>
             </Grid>
@@ -569,25 +496,54 @@ export function PointOfSale() {
         </Grid>
       </Box>
 
+      {/* Package Direct Buttons */}
+      <Box sx={{ px: 1.5, pt: 1 }}>
+        <Typography variant="caption" sx={{ color: '#ccc', fontWeight: 'bold', display: 'block', mb: 0.5 }}>
+          Items package:
+        </Typography>
+        <Stack direction="row" spacing={1}>
+          {['1kg', '1/2kg', 'custom'].map(pkg => (
+            <Chip
+              key={pkg}
+              label={pkg}
+              size="small"
+              clickable
+              onClick={() => handleDirectPackageClick(pkg)}
+              sx={{
+                bgcolor: 'transparent',
+                color: '#fff',
+                border: '1px solid #fff',
+                fontWeight: 'bold',
+                borderRadius: '16px',
+                px: 1,
+                '&:hover': { bgcolor: '#ffffff22' },
+                '&:active': { transform: 'scale(0.95)' }
+              }}
+            />
+          ))}
+        </Stack>
+      </Box>
+
       {/* Cart List */}
-      <Box className="item-list" sx={{ mt: 1, flex: 1, minHeight: '180px', overflowY: 'auto' }}>
-        <Typography variant="caption" sx={{ px: 1, color: '#666', fontWeight: 'bold' }}>
+      <Box className="item-list" sx={{ mt: 1.5, px: 1, flex: 1, minHeight: '160px', maxHeight: '24vh', overflowY: 'auto', bgcolor: '#ffffff0a', borderRadius: 2, mx: 1 }}>
+        <Typography variant="caption" sx={{ px: 1, py: 0.5, color: '#ffeb3b', fontWeight: 'bold', display: 'block' }}>
           Cart Items (Edit Name, Amount & Qty below):
         </Typography>
         {cart.map((item, index) => (
-          <Box key={item.productId} sx={{ p: 1, borderBottom: '1px solid #eee' }}>
+          <Box key={item.productId} sx={{ p: 1, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
             <Grid container alignItems="center" spacing={1}>
               <Grid size={1}>
-                <Typography variant="body2">{index + 1}</Typography>
+                <Typography variant="body2" sx={{ color: '#fff' }}>{index + 1}</Typography>
               </Grid>
               <Grid size={4}>
                 <TextField
                   size="small"
                   variant="standard"
+                  placeholder="Enter item name..."
                   value={item.productName}
                   onChange={(e) => updateCartItemName(item.productId, e.target.value)}
                   InputProps={{ disableUnderline: true }}
-                  sx={{ '& input': { fontWeight: 'bold', fontSize: '0.85rem', p: 0 } }}
+                  sx={{ '& input': { fontWeight: 'bold', fontSize: '0.85rem', p: 0, color: '#fff' }, '& input::placeholder': { color: 'rgba(255,255,255,0.5)', opacity: 1 } }}
                 />
               </Grid>
               <Grid size={4} display="flex" alignItems="center" gap={0.5}>
@@ -595,27 +551,29 @@ export function PointOfSale() {
                   size="small"
                   type="number"
                   placeholder="Rate"
+                  inputRef={(el) => (rateInputRefs.current[item.productId] = el)}
                   value={item.price || ''}
                   onChange={(e) => updateCartItemRate(item.productId, parseFloat(e.target.value))}
-                  sx={{ width: '70px', '& input': { p: 0.5, textAlign: 'center', fontSize: '0.85rem' } }}
+                  sx={{ width: '70px', bgcolor: '#fff', borderRadius: 1, '& input': { p: 0.5, textAlign: 'center', fontSize: '0.85rem', fontWeight: 'bold' } }}
                 />
-                <Typography variant="caption">×</Typography>
+                <Typography variant="caption" sx={{ color: '#fff' }}>×</Typography>
                 <TextField
                   size="small"
                   type="number"
                   placeholder="Qty"
                   value={item.quantity || ''}
                   onChange={(e) => updateCartItemQty(item.productId, parseFloat(e.target.value))}
-                  sx={{ width: '50px', '& input': { p: 0.5, textAlign: 'center', fontSize: '0.85rem' } }}
+                  sx={{ width: '50px', bgcolor: '#fff', borderRadius: 1, '& input': { p: 0.5, textAlign: 'center', fontSize: '0.85rem' } }}
                 />
               </Grid>
               <Grid size={3} display="flex" justifyContent="flex-end" alignItems="center">
-                <Typography variant="body2" fontWeight="bold" sx={{ mr: 1 }}>
+                <Typography variant="body2" fontWeight="bold" sx={{ mr: 1, color: '#4caf50' }}>
                   ₹{item.total}
                 </Typography>
                 <IconButton
                   size="small"
                   onClick={() => setCart(cart.filter(i => i.productId !== item.productId))}
+                  sx={{ color: '#ff5252' }}
                 >
                   <X size={14} />
                 </IconButton>
@@ -627,55 +585,59 @@ export function PointOfSale() {
       </Box>
 
       {/* Actions Footer */}
-      <Box className="footer-actions" sx={{ mt: 'auto', borderTop: '1px solid #ccc', pt: 1 }}>
-        <Stack direction="row" justifyContent="space-around" mb={1} sx={{ bgcolor: '#f5f5f5', py: 0.5 }}>
+      <Box className="footer-actions" sx={{ mt: 'auto', px: 2, pt: 1 }}>
+        <Stack direction="row" justifyContent="space-around" mb={1} sx={{ py: 0.5 }}>
           <Typography variant="body2">Items: <b>{noOfItems}</b></Typography>
           <Typography variant="body2">Total Qty: <b>{totalQty}</b></Typography>
         </Stack>
-        <Stack direction="row" justifyContent="center" spacing={3} mb={1}>
-          <FormControlLabel control={<Checkbox size="small" checked={paymentMode === 'CASH'} onChange={() => setPaymentMode('CASH')} />} label="CASH" />
-          <FormControlLabel control={<Checkbox size="small" checked={paymentMode === 'SCANNER'} onChange={() => setPaymentMode('SCANNER')} />} label="SCANNER" />
+        <Stack direction="row" justifyContent="center" spacing={4} mb={1}>
+          <FormControlLabel 
+            control={<Checkbox size="small" checked={paymentMode === 'CASH'} onChange={() => setPaymentMode('CASH')} sx={{ color: '#fff', '&.Mui-checked': { color: '#fff' } }} />} 
+            label={<Typography sx={{ fontSize: '0.85rem', fontWeight: 'bold' }}>CASH</Typography>} 
+          />
+          <FormControlLabel 
+            control={<Checkbox size="small" checked={paymentMode === 'SCANNER'} onChange={() => setPaymentMode('SCANNER')} sx={{ color: '#fff', '&.Mui-checked': { color: '#fff' } }} />} 
+            label={<Typography sx={{ fontSize: '0.85rem', fontWeight: 'bold' }}>SCANNER</Typography>} 
+          />
         </Stack>
-        <Button variant="contained" fullWidth sx={{ bgcolor: '#242845', py: 1.5 }} startIcon={<Printer size={20} />} onClick={() => setShowPreview(true)}>
-          Total: ₹{finalTotal.toLocaleString('en-IN')} - PREVIEW
+        <Button variant="contained" fullWidth sx={{ bgcolor: '#0b1d42', border: '1px solid #fff', py: 1.5, fontWeight: 'bold' }} startIcon={<Printer size={20} />} onClick={() => setShowPreview(true)}>
+          TOTAL: ₹{finalTotal.toLocaleString('en-IN')} - PREVIEW
         </Button>
       </Box>
 
-      {/* Custom Item Entry Dialog */}
-      <Dialog open={showCustomModal} onClose={() => setShowCustomModal(false)} fullWidth maxWidth="xs">
-        <DialogTitle sx={{ textAlign: 'center', fontWeight: 'bold' }}>Add Custom Product</DialogTitle>
-        <DialogContent sx={{ p: 2 }}>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField
-              label="Product Name"
-              size="small"
+      {/* Package Selection Dialog / Popup */}
+      <Dialog open={showPkgModal} onClose={() => setShowPkgModal(false)} fullWidth maxWidth="xs">
+        <DialogTitle sx={{ textAlign: 'center', fontWeight: 'bold', color: '#0b1d42' }}>
+          Select Package Type
+        </DialogTitle>
+        <DialogContent sx={{ p: 2, textAlign: 'center' }}>
+          <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2, color: '#333' }}>
+            {selectedProduct?.name}
+          </Typography>
+          <Stack spacing={1.5} direction="row" justifyContent="center">
+            <Button
+              variant="contained"
+              size="large"
               fullWidth
-              autoFocus
-              value={customName}
-              onChange={(e) => setCustomName(e.target.value)}
-            />
-            <TextField
-              label="Price (₹)"
-              type="number"
-              size="small"
+              onClick={() => handleSelectPackage('1kg')}
+              sx={{ bgcolor: '#0b1d42', color: '#fff', fontWeight: 'bold', py: 1.5 }}
+            >
+              1 KG
+            </Button>
+            <Button
+              variant="contained"
+              size="large"
               fullWidth
-              value={customPrice}
-              onChange={(e) => setCustomPrice(e.target.value ? Number(e.target.value) : '')}
-            />
-            <TextField
-              label="Quantity"
-              type="number"
-              size="small"
-              fullWidth
-              value={customQty}
-              onChange={(e) => setCustomQty(e.target.value ? Number(e.target.value) : '')}
-            />
+              onClick={() => handleSelectPackage('1/2kg')}
+              sx={{ bgcolor: '#1976d2', color: '#fff', fontWeight: 'bold', py: 1.5 }}
+            >
+              1/2 KG
+            </Button>
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button variant="outlined" fullWidth onClick={() => setShowCustomModal(false)}>Cancel</Button>
-          <Button variant="contained" fullWidth onClick={handleAddCustomToCart} sx={{ bgcolor: '#242845' }}>
-            Add To Cart
+        <DialogActions sx={{ justifyContent: 'center', pb: 2 }}>
+          <Button variant="outlined" color="error" onClick={() => setShowPkgModal(false)}>
+            Cancel
           </Button>
         </DialogActions>
       </Dialog>
@@ -691,36 +653,11 @@ export function PointOfSale() {
           
           <Divider sx={{ my: 1, borderStyle: 'dashed' }} />
           
-          {/* Customer & GST Fields */}
           <Stack spacing={1} sx={{ mb: 1.5 }}>
-            <TextField 
-              label="Customer Name" 
-              size="small" 
-              fullWidth 
-              value={customerName} 
-              onChange={(e) => setCustomerName(e.target.value)} 
-            />
-            <TextField 
-              label="Customer Phone" 
-              size="small" 
-              fullWidth 
-              value={customerPhone} 
-              onChange={(e) => setCustomerPhone(e.target.value)} 
-            />
-            <TextField 
-              label="Address" 
-              size="small" 
-              fullWidth 
-              value={customerAddress} 
-              onChange={(e) => setCustomerAddress(e.target.value)} 
-            />
-            <TextField 
-              label="Customer GSTIN (Optional)" 
-              size="small" 
-              fullWidth 
-              value={customerGst} 
-              onChange={(e) => setCustomerGst(e.target.value)} 
-            />
+            <TextField label="Customer Name" size="small" fullWidth value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+            <TextField label="Customer Phone" size="small" fullWidth value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+            <TextField label="Address" size="small" fullWidth value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} />
+            <TextField label="Customer GSTIN (Optional)" size="small" fullWidth value={customerGst} onChange={(e) => setCustomerGst(e.target.value)} />
             <FormControlLabel
               control={<Switch checked={gstEnabled} onChange={(e) => setGstEnabled(e.target.checked)} />}
               label={`Enable GST (2.5% CGST + 2.5% SGST)`}
@@ -729,20 +666,10 @@ export function PointOfSale() {
 
           <Divider sx={{ my: 1, borderStyle: 'dashed' }} />
 
-          {/* Customer info display inside preview */}
-          {(customerName || customerPhone || customerAddress || customerGst) && (
-            <Box sx={{ mb: 1, p: 1, bgcolor: '#f9f9f9', borderRadius: 1 }}>
-              {customerName && <Typography variant="caption" display="block"><b>Customer:</b> {customerName}</Typography>}
-              {customerPhone && <Typography variant="caption" display="block"><b>Phone:</b> {customerPhone}</Typography>}
-              {customerAddress && <Typography variant="caption" display="block"><b>Address:</b> {customerAddress}</Typography>}
-              {customerGst && <Typography variant="caption" display="block"><b>GSTIN:</b> {customerGst}</Typography>}
-            </Box>
-          )}
-
           {cart.map((item, i) => (
             <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
               <Typography variant="body2">
-                {i + 1}. {item.productName} ({item.price}x{item.quantity})
+                {i + 1}. {item.productName || 'Custom'} ({item.price}x{item.quantity})
               </Typography>
               <Typography variant="body2">
                 ₹{Number(item.total).toFixed(2)}
@@ -782,26 +709,9 @@ export function PointOfSale() {
           </Box>
 
           {paymentMode === 'SCANNER' && (
-            <Box sx={{
-              textAlign: 'center',
-              mt: 2, pt: 2,
-              borderTop: '1px dashed #ccc',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center'
-            }}>
+            <Box sx={{ textAlign: 'center', mt: 2, pt: 2, borderTop: '1px dashed #ccc', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <Typography variant="body2" sx={{ mb: 1 }}>Scan to Pay</Typography>
-              <Box
-                component="img"
-                src="/qr-code1.jpeg"
-                alt="QR"
-                sx={{
-                  width: '120px',
-                  height: '120px',
-                  objectFit: 'contain',
-                  mt: 1
-                }}
-              />
+              <Box component="img" src="/qr-code1.jpeg" alt="QR" sx={{ width: '120px', height: '120px', objectFit: 'contain', mt: 1 }} />
             </Box>
           )}
         </DialogContent>
@@ -815,23 +725,8 @@ export function PointOfSale() {
             <Button fullWidth variant="outlined" onClick={() => setShowDiscountInput(!showDiscountInput)}>Discount</Button>
           </Stack>
           <Box sx={{ display: 'flex', gap: 1, mt: 1, width: '100%' }}>
-            <Button
-              variant="contained"
-              fullWidth
-              onClick={handleFinalPrint}
-              sx={{ bgcolor: '#4caf50' }}
-            >
-              Print & Save
-            </Button>
-            <Button
-              variant="outlined"
-              fullWidth
-              onClick={handleSaveOnly}
-              startIcon={<Save size={20} />}
-              sx={{ color: '#2196f3', borderColor: '#2196f3' }}
-            >
-              Save Only
-            </Button>
+            <Button variant="contained" fullWidth onClick={handleFinalPrint} sx={{ bgcolor: '#4caf50' }}>Print & Save</Button>
+            <Button variant="outlined" fullWidth onClick={handleSaveOnly} startIcon={<Save size={20} />} sx={{ color: '#2196f3', borderColor: '#2196f3' }}>Save Only</Button>
           </Box>
         </DialogActions>
       </Dialog>
