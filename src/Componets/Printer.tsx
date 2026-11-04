@@ -375,7 +375,7 @@ export function PointOfSale() {
       let billHeader = `\n${SIZE_BIG}${BOLD_ON}Niranjana Enterprises ${BOLD_OFF}${SIZE_NORMAL}\n` +
         `No.13/139, sikkarapuram,\n Kovur ,Chennai - 600069\n` +
         `Mob:9940134227 \n--------------------------------\n` +
-        `Gst no 3##ZWPA6106G1##\n--------------------------------\n` +
+        `Gst no 33BWUPR7527N1ZI\n--------------------------------\n` +
         `DT: ${dateStr}  TM: ${timeStr}\nBill No: ${billNo}\n` +
         `--------------------------------\n` +
         `${BOLD_ON}  Item                 Rate        Qty   Amount${BOLD_OFF}\n` +
@@ -625,7 +625,7 @@ await char.writeValue(enc.encode(billFooter));
           <Box sx={{ textAlign: 'center', mb: 1 }}>
             <Box component="img" src="/icon-5121.png" alt="" sx={{ width: '60px', height: '60px', mb: '5px' }} />
             <Typography variant="h6" fontWeight="bold">Niranjana Enterprises </Typography>
-            <Typography variant="caption" display="block">No.13/139, sikkarayapuram,CH-600069, Gst no 3##ZWPA6106G1##</Typography>
+            <Typography variant="caption" display="block">No.13/139, sikkarayapuram,CH-600069, Gst no 33BWUPR7527N1ZI</Typography>
           </Box>
           <Divider sx={{ my: 1, borderStyle: 'dashed' }} />
           {cart.map((item, i) => (
