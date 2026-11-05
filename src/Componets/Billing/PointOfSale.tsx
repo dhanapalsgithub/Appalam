@@ -17,6 +17,7 @@ declare global {
 interface POSItem {
   productId: string;
   productName: string;
+  subDetail?: string;
   quantity: number;
   price: number;
   total: number;
@@ -121,17 +122,19 @@ export function PointOfSale() {
     setShowPkgModal(true);
   };
 
-  // Add Selected Product with chosen package to Cart
+  // Add Selected Product with default Appalam category to Cart
   const handleSelectPackage = (pkgType: string) => {
     if (!selectedProduct) return;
     const newId = `${selectedProduct.id}_${Date.now()}`;
-    const itemFullName = `${selectedProduct.name} (${pkgType})`;
+    const mainTitle = `Appalam ${pkgType}`;
+    const subTitle = `[${selectedProduct.name}]`;
 
     setCart(prev => [
       ...prev,
       {
         productId: newId,
-        productName: itemFullName,
+        productName: mainTitle,
+        subDetail: subTitle,
         quantity: 1,
         price: 0,
         total: 0,
@@ -147,7 +150,7 @@ export function PointOfSale() {
   // Add Custom / Package directly from bottom bar
   const handleDirectPackageClick = (pkgName: string) => {
     const newId = `custom_${Date.now()}`;
-    const name = pkgName === 'custom' ? '' : pkgName;
+    const name = pkgName === 'custom' ? 'Appalam Custom' : `Appalam ${pkgName}`;
     setCart(prev => [...prev, {
       productId: newId,
       productName: name,
@@ -236,7 +239,7 @@ export function PointOfSale() {
         customerAddress: customerAddress || '',
         customerGst: customerGst || '',
         gstEnabled: gstEnabled,
-        items: cart.map(i => `${i.productName || 'Custom'}(${i.price}x${i.quantity})`).join(", "),
+        items: cart.map(i => `${i.productName} ${i.subDetail || ''}(${i.price}x${i.quantity})`).join(", "),
         subtotal: Math.round(subtotal),
         discount: discount,
         finalTotal: finalTotal,
@@ -295,6 +298,7 @@ export function PointOfSale() {
       const enc = new TextEncoder();
       const INIT = '\x1B\x40';
       const CENTER = '\x1B\x61\x01';
+      const LEFT = '\x1B\x61\x00';
       const BOLD_ON = '\x1B\x45\x01';
       const BOLD_OFF = '\x1B\x45\x00';
       const SIZE_BIG = '\x1D\x21\x11';
@@ -341,40 +345,44 @@ export function PointOfSale() {
         if (customerGst) billHeader += `Cust GST: ${customerGst}\n`;
       }
 
+      // Column Header - Fixed width 32 Characters total for 58mm Thermal Printers
+      // Item (13) | Rate (6) | Qty (5) | Amount (8)
       billHeader += `--------------------------------\n` +
-        `${BOLD_ON}  Item                Rate     Qty  Amount${BOLD_OFF}\n` +
-        `------------------------------------------\n`;
+        `${LEFT}${BOLD_ON}Item         Rate  Qty   Amount${BOLD_OFF}\n` +
+        `--------------------------------\n`;
       await sendLargeData(char, billHeader);
 
       let itemsData = "";
       const STYLE_NORMAL = '\x1B\x21\x00';
 
-      cart.forEach((item, index) => {
-        const sno = (index + 1).toString().padEnd(3);
-        const name = (item.productName || 'Custom').substring(0, 10).padEnd(14);
-        const rate = parseFloat(String(item.price)).toFixed(2).padStart(9);
-        const qty = parseFloat(String(item.quantity)).toFixed(2).padStart(9);
-        const total = parseFloat(String(item.total)).toFixed(2).padStart(7);
-        itemsData += `${STYLE_NORMAL}${sno}${name}${rate}${qty}${total}\n`;
-        itemsData += `----------------------------------------------\n`;
+      cart.forEach((item) => {
+        const name = (item.productName || 'Appalam').substring(0, 12).padEnd(12);
+        const rate = parseFloat(String(item.price)).toFixed(0).padStart(6);
+        const qty = (String(item.quantity) + (item.pkgType?.includes('kg') ? 'Kg' : '')).padStart(5);
+        const total = parseFloat(String(item.total)).toFixed(0).padStart(8);
+
+        itemsData += `${STYLE_NORMAL}${name} ${rate} ${qty} ${total}\n`;
+        if (item.subDetail) {
+          itemsData += `  ${item.subDetail}\n`;
+        }
       });
 
       await sendLargeData(char, itemsData);
 
-      let billFooter = `___________________________________________________\n`;
-      billFooter += `${BOLD_ON}${"Subtotal:".padEnd(12)}Rs.${Math.round(subtotal).toString().padStart(10)}${BOLD_OFF}\n`;
-      billFooter += `${"Total Qty:".padEnd(12)}${totalQty.toString().padStart(13)}\n`;
+      let billFooter = `--------------------------------\n`;
+      billFooter += `${BOLD_ON}${"Subtotal:".padEnd(10)}Rs.${Math.round(subtotal).toString().padStart(8)}${BOLD_OFF}\n`;
+      billFooter += `${"Total Qty:".padEnd(10)}${totalQty.toString().padStart(11)}Kg\n`;
       if (discount > 0) {
-        billFooter += `${"Discount:".padEnd(12)}-Rs.${Math.round(discount).toString().padStart(10)}\n`;
+        billFooter += `${"Discount:".padEnd(10)}-Rs.${Math.round(discount).toString().padStart(8)}\n`;
       }
 
       if (gstEnabled) {
-        billFooter += `${"CGST @ 2.5%:".padEnd(12)}Rs.${cgstAmount.toFixed(2).padStart(10)}\n`;
-        billFooter += `${"SGST @ 2.5%:".padEnd(12)}Rs.${sgstAmount.toFixed(2).padStart(10)}\n`;
+        billFooter += `${"CGST @ 2.5%:".padEnd(10)}Rs.${cgstAmount.toFixed(2).padStart(8)}\n`;
+        billFooter += `${"SGST @ 2.5%:".padEnd(10)}Rs.${sgstAmount.toFixed(2).padStart(8)}\n`;
       }
 
       billFooter += `\n${SIZE_BIG}${"NET TOTAL:".padEnd(10)}Rs.${Math.round(finalTotal).toString().padStart(6)}${STYLE_NORMAL}\n`;
-      billFooter += `************************************************\n`;
+      billFooter += `********************************\n`;
       billFooter += `Payment: ${paymentMode}\n`;
 
       await sendLargeData(char, billFooter);
@@ -419,7 +427,7 @@ export function PointOfSale() {
           customerAddress: customerAddress || '',
           customerGst: customerGst || '',
           gstEnabled,
-          items: cart.map(i => `${i.productName || 'Custom'}(${i.price}x${i.quantity})`).join(", "), 
+          items: cart.map(i => `${i.productName} ${i.subDetail || ''}(${i.price}x${i.quantity})`).join(", "), 
           subtotal, 
           discount, 
           finalTotal, 
@@ -545,6 +553,11 @@ export function PointOfSale() {
                   InputProps={{ disableUnderline: true }}
                   sx={{ '& input': { fontWeight: 'bold', fontSize: '0.85rem', p: 0, color: '#fff' }, '& input::placeholder': { color: 'rgba(255,255,255,0.5)', opacity: 1 } }}
                 />
+                {item.subDetail && (
+                  <Typography variant="caption" sx={{ color: '#aaa', display: 'block' }}>
+                    {item.subDetail}
+                  </Typography>
+                )}
               </Grid>
               <Grid size={4} display="flex" alignItems="center" gap={0.5}>
                 <TextField
@@ -619,7 +632,7 @@ export function PointOfSale() {
               variant="contained"
               size="large"
               fullWidth
-              onClick={() => handleSelectPackage('1kg')}
+              onClick={() => handleSelectPackage('1Kg')}
               sx={{ bgcolor: '#0b1d42', color: '#fff', fontWeight: 'bold', py: 1.5 }}
             >
               1 KG
@@ -628,7 +641,7 @@ export function PointOfSale() {
               variant="contained"
               size="large"
               fullWidth
-              onClick={() => handleSelectPackage('1/2kg')}
+              onClick={() => handleSelectPackage('1/2Kg')}
               sx={{ bgcolor: '#1976d2', color: '#fff', fontWeight: 'bold', py: 1.5 }}
             >
               1/2 KG
@@ -669,7 +682,7 @@ export function PointOfSale() {
           {cart.map((item, i) => (
             <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
               <Typography variant="body2">
-                {i + 1}. {item.productName || 'Custom'} ({item.price}x{item.quantity})
+                {i + 1}. {item.productName} {item.subDetail ? item.subDetail : ''} ({item.price}x{item.quantity})
               </Typography>
               <Typography variant="body2">
                 ₹{Number(item.total).toFixed(2)}
