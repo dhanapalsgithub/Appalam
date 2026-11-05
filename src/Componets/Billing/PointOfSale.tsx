@@ -239,7 +239,7 @@ export function PointOfSale() {
         customerAddress: customerAddress || '',
         customerGst: customerGst || '',
         gstEnabled: gstEnabled,
-        items: cart.map(i => `${i.productName} ${i.subDetail || ''}(${i.price}x${i.quantity})`).join(", "),
+        items: cart.map(i => `${i.productName} ${i.subDetail || ''}(${i.price}x${i.quantity}Kg)`).join(", "),
         subtotal: Math.round(subtotal),
         discount: discount,
         finalTotal: finalTotal,
@@ -346,7 +346,7 @@ export function PointOfSale() {
       }
 
       // Column Header - Fixed width 32 Characters total for 58mm Thermal Printers
-      // Item (13) | Rate (6) | Qty (5) | Amount (8)
+      // Item (12) | Rate (6) | Qty (5) | Amount (7)
       billHeader += `--------------------------------\n` +
         `${LEFT}${BOLD_ON}Item         Rate  Qty   Amount${BOLD_OFF}\n` +
         `--------------------------------\n`;
@@ -357,8 +357,8 @@ export function PointOfSale() {
 
       cart.forEach((item) => {
         const name = (item.productName || 'Appalam').substring(0, 12).padEnd(12);
-        const rate = parseFloat(String(item.price)).toFixed(0).padStart(6);
-        const qty = (String(item.quantity) + (item.pkgType?.includes('kg') ? 'Kg' : '')).padStart(5);
+        const rate = parseFloat(String(item.price)).toFixed(0).padStart(5);
+        const qty = (String(item.quantity) + 'Kg').padStart(5);
         const total = parseFloat(String(item.total)).toFixed(0).padStart(8);
 
         itemsData += `${STYLE_NORMAL}${name} ${rate} ${qty} ${total}\n`;
@@ -427,7 +427,7 @@ export function PointOfSale() {
           customerAddress: customerAddress || '',
           customerGst: customerGst || '',
           gstEnabled,
-          items: cart.map(i => `${i.productName} ${i.subDetail || ''}(${i.price}x${i.quantity})`).join(", "), 
+          items: cart.map(i => `${i.productName} ${i.subDetail || ''}(${i.price}x${i.quantity}Kg)`).join(", "), 
           subtotal, 
           discount, 
           finalTotal, 
@@ -567,7 +567,7 @@ export function PointOfSale() {
                   inputRef={(el) => (rateInputRefs.current[item.productId] = el)}
                   value={item.price || ''}
                   onChange={(e) => updateCartItemRate(item.productId, parseFloat(e.target.value))}
-                  sx={{ width: '70px', bgcolor: '#fff', borderRadius: 1, '& input': { p: 0.5, textAlign: 'center', fontSize: '0.85rem', fontWeight: 'bold' } }}
+                  sx={{ width: '60px', bgcolor: '#fff', borderRadius: 1, '& input': { p: 0.5, textAlign: 'center', fontSize: '0.85rem', fontWeight: 'bold' } }}
                 />
                 <Typography variant="caption" sx={{ color: '#fff' }}>×</Typography>
                 <TextField
@@ -576,8 +576,9 @@ export function PointOfSale() {
                   placeholder="Qty"
                   value={item.quantity || ''}
                   onChange={(e) => updateCartItemQty(item.productId, parseFloat(e.target.value))}
-                  sx={{ width: '50px', bgcolor: '#fff', borderRadius: 1, '& input': { p: 0.5, textAlign: 'center', fontSize: '0.85rem' } }}
+                  sx={{ width: '45px', bgcolor: '#fff', borderRadius: 1, '& input': { p: 0.5, textAlign: 'center', fontSize: '0.85rem' } }}
                 />
+                <Typography variant="caption" sx={{ color: '#fff', fontWeight: 'bold' }}>Kg</Typography>
               </Grid>
               <Grid size={3} display="flex" justifyContent="flex-end" alignItems="center">
                 <Typography variant="body2" fontWeight="bold" sx={{ mr: 1, color: '#4caf50' }}>
@@ -601,7 +602,7 @@ export function PointOfSale() {
       <Box className="footer-actions" sx={{ mt: 'auto', px: 2, pt: 1 }}>
         <Stack direction="row" justifyContent="space-around" mb={1} sx={{ py: 0.5 }}>
           <Typography variant="body2">Items: <b>{noOfItems}</b></Typography>
-          <Typography variant="body2">Total Qty: <b>{totalQty}</b></Typography>
+          <Typography variant="body2">Total Qty: <b>{totalQty}Kg</b></Typography>
         </Stack>
         <Stack direction="row" justifyContent="center" spacing={4} mb={1}>
           <FormControlLabel 
@@ -682,7 +683,7 @@ export function PointOfSale() {
           {cart.map((item, i) => (
             <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
               <Typography variant="body2">
-                {i + 1}. {item.productName} {item.subDetail ? item.subDetail : ''} ({item.price}x{item.quantity})
+                {i + 1}. {item.productName} {item.subDetail ? item.subDetail : ''} ({item.price}x{item.quantity}Kg)
               </Typography>
               <Typography variant="body2">
                 ₹{Number(item.total).toFixed(2)}
