@@ -36,12 +36,12 @@ interface Product {
 }
 
 const INITIAL_PRODUCTS: Product[] = [
-  { id: 'app_1', name: 'No:01 - 6 Inch', price: 0, category: 'Appalam', size: '6 Inch', type: 'Appalam', unit: 'pkt' },
-  { id: 'app_2', name: 'No:02 - 5.25 Inch', price: 0, category: 'Appalam', size: '5.25 Inch', type: 'Appalam', unit: 'pkt' },
-  { id: 'app_3', name: 'No:03 - 4.75 Inch', price: 0, category: 'Appalam', size: '4.75 Inch', type: 'Appalam', unit: 'pkt' },
-  { id: 'app_4', name: 'No:04 - 4.25 Inch', price: 0, category: 'Appalam', size: '4.25 Inch', type: 'Appalam', unit: 'pkt' },
-  { id: 'app_5', name: 'No:05 - 4 inch', price: 0, category: 'Appalam', size: '4 inch', type: 'Appalam', unit: 'pkt' },
-  { id: 'app_6', name: 'No:06 - 3.25 Inch', price: 0, category: 'Appalam', size: '3.25 Inch', type: 'Appalam', unit: 'pkt' },
+  { id: 'app_1', name: 'No:01-6inch', price: 0, category: 'Appalam', size: '6inch', type: 'Appalam', unit: 'pkt' },
+  { id: 'app_2', name: 'No:02-5.25inch', price: 0, category: 'Appalam', size: '5.25inch', type: 'Appalam', unit: 'pkt' },
+  { id: 'app_3', name: 'No:03-4.75inch', price: 0, category: 'Appalam', size: '4.75inch', type: 'Appalam', unit: 'pkt' },
+  { id: 'app_4', name: 'No:04-4.25inch', price: 0, category: 'Appalam', size: '4.25inch', type: 'Appalam', unit: 'pkt' },
+  { id: 'app_5', name: 'No:05-4inch', price: 0, category: 'Appalam', size: '4inch', type: 'Appalam', unit: 'pkt' },
+  { id: 'app_6', name: 'No:06-3.25inch', price: 0, category: 'Appalam', size: '3.25inch', type: 'Appalam', unit: 'pkt' },
 ];
 
 let cachedDevice: any = null;
@@ -334,7 +334,7 @@ export function PointOfSale() {
         `no 13/139,sivashakthi Nagar,sikkarayapuram \n--------------------------------\n` +
         `chennai-69.\n` +
         `Mob: 9043707705,8248455168\n--------------------------------\n` +
-        `GST NO: 33##WPA61061Z#\n--------------------------------\n` +
+        `GST NO: 33BWUPR7527N1ZI\n--------------------------------\n` +
         `DT: ${dateStr}  TM: ${timeStr}\nBill No: ${billNo}\n`;
 
       if (customerName || customerPhone || customerAddress || customerGst) {
@@ -345,32 +345,31 @@ export function PointOfSale() {
         if (customerGst) billHeader += `Cust GST: ${customerGst}\n`;
       }
 
-      // Column Header - Fixed width 32 Characters total for 58mm Thermal Printers
-      // Item (12) | Rate (6) | Qty (5) | Amount (7)
-      billHeader += `--------------------------------\n` +
-        `${LEFT}${BOLD_ON}Item         Rate  Qty   Amount${BOLD_OFF}\n` +
-        `--------------------------------\n`;
+      // Column Header - Fixed width layout matching 32 characters for thermal printer
+      billHeader += `----------------------------------------------\n` +
+        `${LEFT}${BOLD_ON}Item                Rate         Qty      Amount${BOLD_OFF}\n` +
+        `-----------------------------------------------\n`;
       await sendLargeData(char, billHeader);
 
       let itemsData = "";
       const STYLE_NORMAL = '\x1B\x21\x00';
 
       cart.forEach((item) => {
-        const name = (item.productName || 'Appalam').substring(0, 12).padEnd(12);
-        const rate = parseFloat(String(item.price)).toFixed(0).padStart(5);
-        const qty = (String(item.quantity) + 'Kg').padStart(5);
-        const total = parseFloat(String(item.total)).toFixed(0).padStart(8);
+        const name = (item.productName || 'Appalam').substring(0, 12).padEnd(15);
+        const rate = parseFloat(String(item.price)).toFixed(0).padStart(10);
+        const qty = (String(item.quantity) + 'Kg').padStart(9);
+        const total = parseFloat(String(item.total)).toFixed(0).padStart(9);
 
         itemsData += `${STYLE_NORMAL}${name} ${rate} ${qty} ${total}\n`;
         if (item.subDetail) {
           itemsData += `  ${item.subDetail}\n`;
         }
+        itemsData += `----------------------------------------------\n`;
       });
 
       await sendLargeData(char, itemsData);
 
-      let billFooter = `--------------------------------\n`;
-      billFooter += `${BOLD_ON}${"Subtotal:".padEnd(10)}Rs.${Math.round(subtotal).toString().padStart(8)}${BOLD_OFF}\n`;
+      let billFooter = `${BOLD_ON}${"Subtotal:".padEnd(10)}Rs.${Math.round(subtotal).toString().padStart(8)}${BOLD_OFF}\n`;
       billFooter += `${"Total Qty:".padEnd(10)}${totalQty.toString().padStart(11)}Kg\n`;
       if (discount > 0) {
         billFooter += `${"Discount:".padEnd(10)}-Rs.${Math.round(discount).toString().padStart(8)}\n`;
@@ -493,10 +492,10 @@ export function PointOfSale() {
                 }}
               >
                 <Typography variant="caption" sx={{ fontWeight: 800, fontSize: '0.8rem', color: '#0b1d42' }}>
-                  {p.name.split(' - ')[0]}
+                  {p.name.split('-')[0]}
                 </Typography>
                 <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.7rem', color: '#555' }}>
-                  {p.name.split(' - ')[1]}
+                  {p.name.split('-')[1]}
                 </Typography>
               </Box>
             </Grid>
@@ -662,7 +661,7 @@ export function PointOfSale() {
         <DialogContent sx={{ p: 2 }}>
           <Box sx={{ textAlign: 'center', mb: 1 }}>
             <Typography variant="h6" fontWeight="bold">Niranjana Enterprises</Typography>
-            <Typography variant="caption" display="block">Appalam Store, GST: 3##ZWPA61061#</Typography>
+            <Typography variant="caption" display="block">Appalam Store, GST: 3BWUPR7527N1ZI</Typography>
           </Box>
           
           <Divider sx={{ my: 1, borderStyle: 'dashed' }} />
@@ -681,7 +680,7 @@ export function PointOfSale() {
           <Divider sx={{ my: 1, borderStyle: 'dashed' }} />
 
           {cart.map((item, i) => (
-            <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+            <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5, borderBottom: '1px dashed #eee', pb: 0.5 }}>
               <Typography variant="body2">
                 {i + 1}. {item.productName} {item.subDetail ? item.subDetail : ''} ({item.price}x{item.quantity}Kg)
               </Typography>
