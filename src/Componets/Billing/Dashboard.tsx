@@ -360,12 +360,12 @@ export const Dashboard = () => {
           <Typography variant="h4" fontWeight="800" color="#2B3674">Niranjana Enterprises</Typography>
           <Typography variant="body2" color="textSecondary">Business Analytics</Typography>
         </Box>
-        <Stack direction="row" spacing={1}>
+        {/* <Stack direction="row" spacing={1}>
           <Button variant="outlined" color="error" size="small" startIcon={<RestartAlt />} onClick={handleResetDashboard}>
             Reset Bill #1
           </Button>
           <IconButton onClick={() => loadData()}><Refresh className={refreshing ? 'spin' : ''} /></IconButton>
-        </Stack>
+        </Stack> */}
       </Box>
 
       <Tabs value={currentTab} onChange={(_, val) => setCurrentTab(val)} sx={{ mb: 3 }}>
