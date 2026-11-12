@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Delete, ChevronRight, CalendarMonth, Event, ArrowBack } from '@mui/icons-material';
+import { Delete, ChevronRight, CalendarMonth, Event, ArrowBack, RestartAlt } from '@mui/icons-material';
 import {
   Box, Card, Typography, Stack, Avatar, CircularProgress, IconButton,
   Tabs, Tab, Divider, Dialog, DialogTitle, DialogContent, Button, List, ListItem, ListItemText
@@ -58,11 +58,9 @@ const sendLargeData = async (characteristic: any, data: string | Uint8Array) => 
   }
 };
 
-// --- Helper Function to Clean & Format Time Correctly ---
 const formatFriendlyTime = (timeVal: any) => {
   if (!timeVal) return '';
   const timeStr = String(timeVal);
-  // If it's an ISO string like "1899-12-30T07:28:50.000Z"
   if (timeStr.includes('T') || timeStr.includes('-')) {
     const d = new Date(timeStr);
     if (!isNaN(d.getTime())) {
@@ -147,6 +145,17 @@ export const Dashboard = () => {
   }, [deletedBills]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Handle Full Reset (Clears LocalStorage and resets bill number to 1)
+  const handleResetDashboard = () => {
+    if (window.confirm("Are you sure you want to reset all local bill counters and cache?")) {
+      localStorage.setItem('lastBillNo', '1');
+      localStorage.removeItem('pos-cart');
+      setInvoices([]);
+      alert("Dashboard and Bill Counter reset to 1 successfully!");
+      window.location.reload();
+    }
+  };
 
   const hierarchyData = useMemo(() => {
     const monthsObj: { [key: string]: any } = {};
@@ -351,7 +360,12 @@ export const Dashboard = () => {
           <Typography variant="h4" fontWeight="800" color="#2B3674">Niranjana Enterprises</Typography>
           <Typography variant="body2" color="textSecondary">Business Analytics</Typography>
         </Box>
-        <IconButton onClick={() => loadData()}><Refresh className={refreshing ? 'spin' : ''} /></IconButton>
+        <Stack direction="row" spacing={1}>
+          <Button variant="outlined" color="error" size="small" startIcon={<RestartAlt />} onClick={handleResetDashboard}>
+            Reset Bill #1
+          </Button>
+          <IconButton onClick={() => loadData()}><Refresh className={refreshing ? 'spin' : ''} /></IconButton>
+        </Stack>
       </Box>
 
       <Tabs value={currentTab} onChange={(_, val) => setCurrentTab(val)} sx={{ mb: 3 }}>
@@ -560,7 +574,7 @@ export const Dashboard = () => {
             Payment: {selectedInvoice?.paymentMode}
           </Typography>
         </DialogContent>
-        <Stack direction="row" spacing={1} p={2}>
+        <Stack direction="row" spacing={1} p= {2}>
           <Button fullWidth variant="outlined" color="success" onClick={shareBillAsImage}>WhatsApp</Button>
           <Button fullWidth variant="contained" onClick={handleDashboardPrint} sx={{ bgcolor: '#4318FF' }}>Print</Button>
         </Stack>

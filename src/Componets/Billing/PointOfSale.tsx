@@ -74,6 +74,7 @@ export function PointOfSale() {
 
   const [billNo, setBillNo] = useState(() => {
     const saved = localStorage.getItem('lastBillNo');
+    // If no saved bill or if it was invalid, start from 1
     return saved ? parseInt(saved, 10) : 1;
   });
 
@@ -228,7 +229,7 @@ export function PointOfSale() {
   const handleSaveOnly = async () => {
     if (cart.length === 0) return alert("Cart is empty!");
     const dateStr = new Date().toLocaleDateString('en-GB');
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
     try {
       const invoiceData = {
         billNo: billNo,
@@ -327,7 +328,7 @@ export function PointOfSale() {
 
       const now = new Date();
       const dateStr = now.toLocaleDateString('en-GB');
-      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 
       let billHeader = `\n${SIZE_BIG}${BOLD_ON}Niranjana Enterprises ${SIZE_NORMAL}.${BOLD_OFF}\n` +
         `Namma Appalam\n` +
@@ -463,7 +464,7 @@ export function PointOfSale() {
         <Typography variant="body2" sx={{ opacity: 0.8 }}>{new Date().toLocaleDateString('en-GB')}</Typography>
         <Typography variant="h6" fontWeight="bold" sx={{ color: '#fff' }}>Niranjana Enterprises</Typography>
         <Stack direction="row" justifyContent="space-between" px={2} sx={{ mt: 0.5 }}>
-          <Typography variant="caption">Time: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Typography>
+          <Typography variant="caption">Time: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}</Typography>
           <Typography variant="caption">Date: {new Date().toLocaleDateString('en-GB')}</Typography>
         </Stack>
       </Box>
