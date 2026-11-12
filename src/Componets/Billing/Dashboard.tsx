@@ -12,43 +12,49 @@ import {
 } from '@mui/icons-material';
 
 // --- Helper Functions for Printer ---
-const getImageBytes = async (url: string, width: number) => {
+const getImageBytes = async (url: string, printWidth: number = 200): Promise<Uint8Array | null> => {
   try {
-    const response = await fetch(url);
-    const blob = await response.blob();
-    const img = await createImageBitmap(blob);
+    const img = new Image();
+    img.src = url;
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+    });
     const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-    const height = Math.round((img.height / img.width) * width);
+    const width = printWidth;
+    const height = Math.floor(img.height * (width / img.width));
     canvas.width = width;
     canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
     ctx.drawImage(img, 0, 0, width, height);
     const imageData = ctx.getImageData(0, 0, width, height);
-    const pixels = imageData.data;
-    const bits = new Uint8Array((width * height) / 8);
-    for (let i = 0; i < pixels.length; i += 4) {
-      const avg = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
-      if (avg < 128) {
-        const pixelIdx = i / 4;
-        bits[Math.floor(pixelIdx / 8)] |= (128 >> (pixelIdx % 8));
+    const { data } = imageData;
+    const printData: number[] = [];
+    printData.push(0x1d, 0x76, 0x30, 0, Math.ceil(width / 8), 0, height % 256, Math.floor(height / 256));
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < Math.ceil(width / 8); x++) {
+        let byte = 0;
+        for (let b = 0; b < 8; b++) {
+          const i = ((y * width) + (x * 8) + b) * 4;
+          const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+          if (avg < 128) byte |= (0x80 >> b);
+        }
+        printData.push(byte);
       }
     }
-    const header = new Uint8Array([0x1D, 0x76, 0x30, 0, width / 8, 0, height % 256, Math.floor(height / 256)]);
-    const result = new Uint8Array(header.length + bits.length);
-    result.set(header);
-    result.set(bits, header.length);
-    return result;
+    return new Uint8Array(printData);
   } catch (e) { return null; }
 };
 
-const sendLargeData = async (characteristic: any, data: any) => {
-  const enc = new TextEncoder();
-  const bytes = typeof data === 'string' ? enc.encode(data) : data;
-  const CHUNK_SIZE = 512;
-  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
-    const chunk = bytes.slice(i, i + CHUNK_SIZE);
+const sendLargeData = async (characteristic: any, data: string | Uint8Array) => {
+  const chunkSize = 100;
+  const encoder = new TextEncoder();
+  const bytes = typeof data === 'string' ? encoder.encode(data) : data;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.slice(i, i + chunkSize);
     await characteristic.writeValue(chunk);
+    await new Promise(r => setTimeout(r, 10));
   }
 };
 
@@ -84,7 +90,6 @@ export const Dashboard = () => {
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwO6j5rzaFkVUQyYeFWNTT1k-kdx6P4M61iPH1pSlQFXa04al99FyR982zoqJb3VdXl4g/exec";
   const monthsArr = ["Jan", "Feb", "Mar", "Apr", "May", "june", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-  // --- DATA LOADING WITH STRING DATE FIX & CUSTOMER GST DETAILS ---
   const loadData = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true);
     setRefreshing(true);
@@ -110,11 +115,14 @@ export const Dashboard = () => {
             ...inv,
             date: dateStr,
             finalTotal: Number(inv.finalTotal || 0),
+            subtotal: Number(inv.subtotal || inv.finalTotal || 0),
+            discount: Number(inv.discount || 0),
             billNo: String(inv.billNo || ''),
             customerName: inv.customerName || inv.billTo || 'Walk-in',
             customerPhone: inv.customerPhone || inv.customerNumber || '',
             customerAddress: inv.customerAddress || inv.address || '',
-            customerGst: inv.customerGst || inv.customerGstin || ''
+            customerGst: inv.customerGst || inv.customerGstin || '',
+            paymentMode: inv.paymentMode || 'CASH'
           };
         });
         setInvoices(formattedData.filter(inv => !deletedBills.includes(inv.billNo)));
@@ -216,68 +224,106 @@ export const Dashboard = () => {
       if (!nav.bluetooth) return alert("Bluetooth not supported");
       const device = await nav.bluetooth.requestDevice({
         acceptAllDevices: true,
-        optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
+        optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', '0000ff00-0000-1000-8000-00805f9b34fb']
       });
       const server = await device.gatt.connect();
-      const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-      const characteristics = await service.getCharacteristics();
-      const char = characteristics.find((c: any) => c.properties.write || c.properties.writeWithoutResponse);
-      if (!char) return;
+      const services = await server.getPrimaryServices();
+      const char = (await services[0].getCharacteristics()).find((c: any) =>
+        c.properties.write || c.properties.writeWithoutResponse
+      );
+      if (!char) return alert("Cannot connect to Printer characteristic.");
 
       const enc = new TextEncoder();
       const INIT = '\x1B\x40';
       const CENTER = '\x1B\x61\x01';
+      const LEFT = '\x1B\x61\x00';
+      const BOLD_ON = '\x1B\x45\x01';
+      const BOLD_OFF = '\x1B\x45\x00';
+      const SIZE_BIG = '\x1D\x21\x11';
+      const SIZE_NORMAL = '\x1D\x21\x00';
 
       await char.writeValue(enc.encode(INIT + CENTER));
       await char.writeValue(enc.encode('\x1B\x40'));
       await new Promise(r => setTimeout(r, 500));
       await char.writeValue(enc.encode('\x1B\x61\x01'));
 
-      const logoBytes = await getImageBytes('/logo-5121.png', 150);
+      const logoBytes = await getImageBytes('/icon-5121.png', 170);
       if (logoBytes) await sendLargeData(char, logoBytes);
 
-      let header = `Niranjana Enterprises\nChennai - 600069\n9043707705\n--------------------------------\n` +
-        `Bill No: ${selectedInvoice.billNo}\n` +
-        `DT: ${selectedInvoice.date} | ${selectedInvoice.time}\n`;
+      let billHeader = `\n${SIZE_BIG}${BOLD_ON}Niranjana Enterprises ${SIZE_NORMAL}.${BOLD_OFF}\n` +
+        `Namma Appalam\n` +
+        `no 13/139,sivashakthi Nagar,sikkarayapuram \n--------------------------------\n` +
+        `chennai-69.\n` +
+        `Mob: 9043707705,8248455168\n--------------------------------\n` +
+        `GST NO: 33BWUPR7527N1ZI\n--------------------------------\n` +
+        `DT: ${selectedInvoice.date}  TM: ${selectedInvoice.time || ''}\nBill No: ${selectedInvoice.billNo}\n`;
 
       if (selectedInvoice.customerName || selectedInvoice.customerPhone || selectedInvoice.customerAddress || selectedInvoice.customerGst) {
-        header += `--------------------------------\n`;
-        if (selectedInvoice.customerName) header += `Customer: ${selectedInvoice.customerName}\n`;
-        if (selectedInvoice.customerPhone) header += `Phone: ${selectedInvoice.customerPhone}\n`;
-        if (selectedInvoice.customerAddress) header += `Address: ${selectedInvoice.customerAddress}\n`;
-        if (selectedInvoice.customerGst) header += `Cust GST: ${selectedInvoice.customerGst}\n`;
+        billHeader += `--------------------------------\n`;
+        if (selectedInvoice.customerName) billHeader += `Customer: ${selectedInvoice.customerName}\n`;
+        if (selectedInvoice.customerPhone) billHeader += `Phone: ${selectedInvoice.customerPhone}\n`;
+        if (selectedInvoice.customerAddress) billHeader += `Address: ${selectedInvoice.customerAddress}\n`;
+        if (selectedInvoice.customerGst) billHeader += `Cust GST: ${selectedInvoice.customerGst}\n`;
       }
 
-      header += `--------------------------------\n` +
-        `   Item            Rate     Qty   Amount\n` +
-        `--------------------------------------------\n`;
-      await sendLargeData(char, header);
+      billHeader += `----------------------------------------------\n` +
+        `${LEFT}${BOLD_ON}Item                Rate         Qty      Amount${BOLD_OFF}\n` +
+        `-----------------------------------------------\n`;
+      await sendLargeData(char, billHeader);
 
-      const itemsList = selectedInvoice.displayItems.map((item: string) => {
-        let name = item.split('(')[0].trim().substring(0, 12);
-        const details = item.split('(')[1]?.replace(')', '') || "";
+      let itemsData = "";
+      const STYLE_NORMAL = '\x1B\x21\x00';
 
-        const ratePart = details.split('x')[0] || "0";
-        const qtyPart = details.split('x')[1] || "1";
-        const amountPart = (Number(ratePart) * Number(qtyPart)).toString();
+      selectedInvoice.displayItems.forEach((itemObj: any) => {
+        const name = (itemObj.name || 'Appalam').substring(0, 12).padEnd(15);
+        const rate = parseFloat(String(itemObj.rate)).toFixed(0).padStart(10);
+        const qty = (String(itemObj.qty) + 'Kg').padStart(9);
+        const total = parseFloat(String(itemObj.amount)).toFixed(0).padStart(9);
 
-        const paddedName = name.padEnd(12, ' ');
-        const paddedRate = ratePart.padStart(7, ' ');
-        const paddedQty = qtyPart.padStart(10, ' ');
-        const paddedAmount = amountPart.padStart(8, ' ');
+        itemsData += `${STYLE_NORMAL}${name} ${rate} ${qty} ${total}\n`;
+        if (itemObj.subDetail) {
+          itemsData += `  ${itemObj.subDetail}\n`;
+        }
+        itemsData += `----------------------------------------------\n`;
+      });
+      await sendLargeData(char, itemsData);
 
-        return `${paddedName}${paddedRate}${paddedQty}${paddedAmount}\n` +
-          `-----------------------------------------------\n`;
-      }).join('');
-      await sendLargeData(char, itemsList);
+      const totalQty = selectedInvoice.displayItems.reduce((acc: number, curr: any) => acc + Number(curr.qty || 0), 0);
+      let billFooter = `${BOLD_ON}${"Subtotal:".padEnd(10)}Rs.${Math.round(selectedInvoice.subtotal).toString().padStart(8)}${BOLD_OFF}\n`;
+      billFooter += `${"Total Qty:".padEnd(10)}${totalQty.toString().padStart(11)}Kg\n`;
+      
+      if (selectedInvoice.discount > 0) {
+        billFooter += `${"Discount:".padEnd(10)}-Rs.${Math.round(selectedInvoice.discount).toString().padStart(8)}\n`;
+      }
 
-      await char.writeValue(enc.encode(CENTER));
-      const footer = `TOTAL: Rs.${selectedInvoice.finalTotal}\n\nNo Returns & No Exchange!!\n\nThank you Visit Again\n\n\n\n\n`;
-      await sendLargeData(char, footer);
+      billFooter += `\n${SIZE_BIG}${"NET TOTAL:".padEnd(10)}Rs.${Math.round(selectedInvoice.finalTotal).toString().padStart(6)}${STYLE_NORMAL}\n`;
+      billFooter += `********************************\n`;
+      billFooter += `Payment: ${selectedInvoice.paymentMode}\n`;
 
-    } catch (err) {
+      await sendLargeData(char, billFooter);
+
+      if (selectedInvoice.paymentMode === 'SCANNER') {
+        const qrBytes = await getImageBytes('/qr-code1.jpeg', 350);
+        if (qrBytes) {
+          await char.writeValue(enc.encode(CENTER));
+          for (let i = 0; i < qrBytes.length; i += 25) {
+            await char.writeValue(qrBytes.slice(i, i + 25));
+            await new Promise(r => setTimeout(r, 10));
+          }
+        }
+      }
+
+      await char.writeValue(new Uint8Array([0x1b, 0x21, 0x01]));
+      await char.writeValue(enc.encode(`${CENTER}No Returns or Exchanges on Food Items.\n`));
+      await char.writeValue(enc.encode(`${CENTER}Thank You! Visit Again`));
+      await char.writeValue(new Uint8Array([0x1b, 0x21, 0x00]));
+
+      await new Promise(r => setTimeout(r, 1000));
+      await char.writeValue(enc.encode('\n\n\x1D\x56\x42\x00'));
+
+    } catch (err: any) {
       console.error(err);
-      alert("Printing failed. Please check connection.");
+      alert("Printing failed: " + err.message);
     }
   };
 
@@ -389,27 +435,44 @@ export const Dashboard = () => {
 
           {viewLevel === 'transactions' && activeMonth && activeDate && (
             <Stack spacing={1}>
-              {hierarchyData[activeMonth].dates[activeDate].map((inv: any, idx: number) => (
-                <Card key={idx} onClick={() => { const items = typeof inv.items === 'string' ? inv.items.split(", ") : []; setSelectedInvoice({ ...inv, displayItems: items }); }}
-                  sx={{ p: 2, borderRadius: '12px', cursor: 'pointer', border: '1px solid #F0F2F8', '&:hover': { bgcolor: '#F9FAFB' } }}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Box>
-                      <Typography fontWeight="bold">Bill #{inv.billNo} {inv.customerName && inv.customerName !== 'Walk-in' ? `- ${inv.customerName}` : ''}</Typography>
-                      <Typography variant="caption" color="textSecondary">{inv.time} • {inv.paymentMode}</Typography>
-                    </Box>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Typography fontWeight="800" color="#4318FF">₹{inv.finalTotal}</Typography>
-                      <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); deleteInvoice(inv.billNo); }}><Delete fontSize="small" /></IconButton>
+              {hierarchyData[activeMonth].dates[activeDate].map((inv: any, idx: number) => {
+                // Parse stored items format neatly for popup & printer
+                const rawItems = typeof inv.items === 'string' ? inv.items.split(", ") : [];
+                const parsedDisplayItems = rawItems.map((itemStr: string) => {
+                  // Example string: "Appalam 1Kg [No:02-5.25inch](150x100Kg)"
+                  const match = itemStr.match(/^(.*?)(?: \[(.*?)\])?\(([\d\.]+)x([\d\.]+)Kg\)$/);
+                  if (match) {
+                    const name = match[1].trim();
+                    const subDetail = match[2] ? `[${match[2]}]` : '';
+                    const rate = Number(match[3]);
+                    const qty = Number(match[4]);
+                    return { name, subDetail, rate, qty, amount: rate * qty };
+                  }
+                  return { name: itemStr, subDetail: '', rate: 0, qty: 1, amount: 0 };
+                });
+
+                return (
+                  <Card key={idx} onClick={() => setSelectedInvoice({ ...inv, displayItems: parsedDisplayItems })}
+                    sx={{ p: 2, borderRadius: '12px', cursor: 'pointer', border: '1px solid #F0F2F8', '&:hover': { bgcolor: '#F9FAFB' } }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Box>
+                        <Typography fontWeight="bold">Bill #{inv.billNo} {inv.customerName && inv.customerName !== 'Walk-in' ? `- ${inv.customerName}` : ''}</Typography>
+                        <Typography variant="caption" color="textSecondary">{inv.time} • {inv.paymentMode}</Typography>
+                      </Box>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Typography fontWeight="800" color="#4318FF">₹{inv.finalTotal}</Typography>
+                        <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); deleteInvoice(inv.billNo); }}><Delete fontSize="small" /></IconButton>
+                      </Stack>
                     </Stack>
-                  </Stack>
-                </Card>
-              ))}
+                  </Card>
+                );
+              })}
             </Stack>
           )}
         </Card>
       )}
 
-      {/* Invoice Detail Dialog with Customer & GST Details */}
+      {/* Invoice Detail Dialog matching POS Preview */}
       <Dialog open={!!selectedInvoice} onClose={() => setSelectedInvoice(null)} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: '24px' } }}>
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography fontWeight="800">Invoice Details</Typography>
@@ -418,15 +481,16 @@ export const Dashboard = () => {
         <DialogContent id="printable-bill">
           <Box sx={{ textAlign: 'center', mb: 2 }}>
             <Typography variant="h6" fontWeight="900">Niranjana Enterprises</Typography>
-            <Typography variant="caption">Chennai - 600069 | 9043707705</Typography>
+            <Typography variant="caption" display="block">Namma Appalam</Typography>
+            <Typography variant="caption">no 13/139,sivashakthi Nagar,sikkarayapuram</Typography>
+            <Typography variant="caption" display="block">chennai-69. Mob: 9043707705</Typography>
+            <Typography variant="caption" display="block"><b>GST NO:</b> 33BWUPR7527N1ZI</Typography>
           </Box>
           <Divider sx={{ borderStyle: 'dashed', my: 1 }} />
           <Stack spacing={0.5}>
+            <Typography variant="caption"><b>DT:</b> {selectedInvoice?.date} | <b>TM:</b> {selectedInvoice?.time}</Typography>
             <Typography variant="caption"><b>Bill No:</b> {selectedInvoice?.billNo}</Typography>
-            <Typography variant="caption"><b>Date:</b> {displayFriendlyDate(selectedInvoice?.date)} | {selectedInvoice?.time}</Typography>
-            <Typography variant="caption"><b>Mode:</b> {selectedInvoice?.paymentMode}</Typography>
             
-            {/* Customer & GST Details Display Section */}
             {(selectedInvoice?.customerName || selectedInvoice?.customerPhone || selectedInvoice?.customerAddress || selectedInvoice?.customerGst) && (
               <Box sx={{ mt: 1, p: 1, bgcolor: '#f5f5f5', borderRadius: 1 }}>
                 {selectedInvoice?.customerName && <Typography variant="caption" display="block"><b>Customer:</b> {selectedInvoice.customerName}</Typography>}
@@ -436,16 +500,52 @@ export const Dashboard = () => {
               </Box>
             )}
           </Stack>
+          
           <Box sx={{ mt: 2, borderTop: '1px solid #000', pt: 1 }}>
-            {selectedInvoice?.displayItems?.map((item: string, i: number) => (
-              <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                <Typography sx={{ fontSize: '11px', flex: 2 }}>{item.split('(')[0]}</Typography>
-                <Typography sx={{ fontSize: '11px', flex: 1, textAlign: 'right' }}>{item.split('x')[1]?.replace(')', '') || 1} x {item.split('(')[1]?.split('x')[0]}</Typography>
+            {selectedInvoice?.displayItems?.map((item: any, i: number) => (
+              <Box key={i} sx={{ mb: 1, borderBottom: '1px dashed #eee', pb: 0.5 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2" sx={{ fontSize: '11px', fontWeight: 'bold' }}>
+                    {i + 1}. {item.name}
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontSize: '11px' }}>
+                    ₹{item.amount}
+                  </Typography>
+                </Box>
+                {item.subDetail && (
+                  <Typography variant="caption" sx={{ fontSize: '10px', color: '#555', display: 'block', pl: 1 }}>
+                    {item.subDetail}
+                  </Typography>
+                )}
+                <Typography variant="caption" sx={{ fontSize: '10px', color: '#666', display: 'block', pl: 1 }}>
+                  Rate: {item.rate} × Qty: {item.qty}Kg
+                </Typography>
               </Box>
             ))}
           </Box>
+
           <Divider sx={{ my: 1 }} />
-          <Typography variant="h6" textAlign="right" fontWeight="900">Total: ₹{selectedInvoice?.finalTotal}</Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Typography variant="body2">Subtotal:</Typography>
+            <Typography variant="body2">₹{selectedInvoice?.subtotal}</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Typography variant="body2">Total Qty:</Typography>
+            <Typography variant="body2">{selectedInvoice?.displayItems?.reduce((s:number, i:any)=> s + Number(i.qty || 0), 0)}Kg</Typography>
+          </Box>
+          {selectedInvoice?.discount > 0 && (
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Typography variant="body2">Discount:</Typography>
+              <Typography variant="body2">-₹{selectedInvoice?.discount}</Typography>
+            </Box>
+          )}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+            <Typography variant="h6" fontWeight="900">NET TOTAL:</Typography>
+            <Typography variant="h6" fontWeight="900">₹{selectedInvoice?.finalTotal}</Typography>
+          </Box>
+          <Typography variant="caption" display="block" textAlign="center" sx={{ mt: 1, fontStyle: 'italic' }}>
+            Payment: {selectedInvoice?.paymentMode}
+          </Typography>
         </DialogContent>
         <Stack direction="row" spacing={1} p={2}>
           <Button fullWidth variant="outlined" color="success" onClick={shareBillAsImage}>WhatsApp</Button>
@@ -453,7 +553,7 @@ export const Dashboard = () => {
         </Stack>
       </Dialog>
 
-      <style>{` @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } .spin { animation: spin 1s linear infinite; } `}</style>
+      <style>{` @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } .spin { align-items: center; animation: spin 1s linear infinite; } `}</style>
     </Box>
   );
 };
