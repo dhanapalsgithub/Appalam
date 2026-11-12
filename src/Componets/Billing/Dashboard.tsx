@@ -58,6 +58,20 @@ const sendLargeData = async (characteristic: any, data: string | Uint8Array) => 
   }
 };
 
+// --- Helper Function to Clean & Format Time Correctly ---
+const formatFriendlyTime = (timeVal: any) => {
+  if (!timeVal) return '';
+  const timeStr = String(timeVal);
+  // If it's an ISO string like "1899-12-30T07:28:50.000Z"
+  if (timeStr.includes('T') || timeStr.includes('-')) {
+    const d = new Date(timeStr);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+    }
+  }
+  return timeStr;
+};
+
 const StatCard = ({ title, value, icon, color, trend, subtitle }: any) => (
   <Card sx={{
     p: 3, borderRadius: '20px', border: '1px solid #E0E4EC', height: '100%', bgcolor: '#242845', color: '#fff',
@@ -103,7 +117,7 @@ export const Dashboard = () => {
 
           if (dateStr.includes('T') || dateStr.includes('-')) {
             const d = new Date(dateStr);
-            if (!isNaN(d.getTime())) {
+            if (!isNaN(d.getTime()) && !dateStr.includes('1899')) {
               const dd = String(d.getDate()).padStart(2, '0');
               const mm = String(d.getMonth() + 1).padStart(2, '0');
               const yyyy = d.getFullYear();
@@ -114,6 +128,7 @@ export const Dashboard = () => {
           return {
             ...inv,
             date: dateStr,
+            time: formatFriendlyTime(inv.time),
             finalTotal: Number(inv.finalTotal || 0),
             subtotal: Number(inv.subtotal || inv.finalTotal || 0),
             discount: Number(inv.discount || 0),
@@ -256,7 +271,7 @@ export const Dashboard = () => {
         `chennai-69.\n` +
         `Mob: 9043707705,8248455168\n--------------------------------\n` +
         `GST NO: 33BWUPR7527N1ZI\n--------------------------------\n` +
-        `DT: ${selectedInvoice.date}  TM: ${selectedInvoice.time || ''}\nBill No: ${selectedInvoice.billNo}\n`;
+        `DT: ${selectedInvoice.date}  TM: ${selectedInvoice.time}\nBill No: ${selectedInvoice.billNo}\n`;
 
       if (selectedInvoice.customerName || selectedInvoice.customerPhone || selectedInvoice.customerAddress || selectedInvoice.customerGst) {
         billHeader += `--------------------------------\n`;
@@ -436,10 +451,8 @@ export const Dashboard = () => {
           {viewLevel === 'transactions' && activeMonth && activeDate && (
             <Stack spacing={1}>
               {hierarchyData[activeMonth].dates[activeDate].map((inv: any, idx: number) => {
-                // Parse stored items format neatly for popup & printer
                 const rawItems = typeof inv.items === 'string' ? inv.items.split(", ") : [];
                 const parsedDisplayItems = rawItems.map((itemStr: string) => {
-                  // Example string: "Appalam 1Kg [No:02-5.25inch](150x100Kg)"
                   const match = itemStr.match(/^(.*?)(?: \[(.*?)\])?\(([\d\.]+)x([\d\.]+)Kg\)$/);
                   if (match) {
                     const name = match[1].trim();
@@ -553,7 +566,7 @@ export const Dashboard = () => {
         </Stack>
       </Dialog>
 
-      <style>{` @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } .spin { align-items: center; animation: spin 1s linear infinite; } `}</style>
+      <style>{` @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } .spin { animation: spin 1s linear infinite; } `}</style>
     </Box>
   );
 };
